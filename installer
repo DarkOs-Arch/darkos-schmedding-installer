@@ -70,23 +70,8 @@ typeset -a BASE_PKGS=(
 "scrot"
 "sudo"
 "xdg-user-dirs"
+"xorg"
 "xorg-drivers" # TODO: should we only install specific drivers?
-"xorg-font-utils"
-"xorg-iceauth"
-"xorg-server"
-"xorg-server-common"
-"xorg-setxkbmap"
-"xorg-xauth"
-"xorg-xbacklight"
-"xorg-xinput"
-"xorg-xkbcomp"
-"xorg-xkill"
-"xorg-xmodmap"
-"xorg-xprop"
-"xorg-xrandr"
-"xorg-xrdb"
-"xorg-xset"
-"xorg-xsetroot"
 "xterm"
 ) # }
 
@@ -1780,6 +1765,9 @@ install_base()
 		find "$MNT/boot" -name '*-ucode.img' -delete
 	elif [[ $DIST == "DarkOs" ]]; then
 		# we have some customizations in /etc on the iso we want to preserve
+		if [ ! -d "$MNT/etc/modprobe.d" ];then
+			mkdir "$MNT/etc/modprobe.d/"
+		fi
 		cp -vf /etc/modprobe.d/* "$MNT/etc/modprobe.d/"  # */
 		cp -vf /etc/X11/xorg.conf.d/* "$MNT/etc/X11/xorg.conf.d/"  # */
 		cp -vf /etc/dialogrc "$MNT/etc/dialogrc"
@@ -2019,12 +2007,12 @@ install_packages()
 	if [[ $PACSTRAP -eq 1 ]]; then
 		blk="$(lsblk -f)"
 		lspci | grep -qi 'broadcom' && inpkg+=('b43-firmware' 'b43-fwcutter' 'broadcom-wl')
-		grep -qi 'ntfs' <<< "$blk" && inpkg+=('ntfs-3g')
-		grep -qi 'jfs' <<< "$blk" && inpkg+=('jfsutils')
-		grep -qi 'xfs' <<< "$blk" && inpkg+=('xfsprogs')
-		grep -qi 'reiserfs' <<< "$blk" && inpkg+=('reiserfsprogs')
+		[[ $blk =~ ntfs ]] && inpkg+=('ntfs-3g')
+		[[ $blk =~ jfs ]] && inpkg+=('jfsutils')
+		[[ $blk =~ xfs ]] && inpkg+=('xfsprogs')
+		[[ $blk =~ reiserfs ]] <<< "$blk" && inpkg+=('reiserfsprogs')
 		[[ $LVM ]] && inpkg+=('lvm2')
-		if [[ $BTRFS_MNT ]] || grep -qi 'btrfs' <<< "$blk"; then
+		if [[ $BTRFS_MNT ]] || [[ $blk =~ btrfs ]]; then
 			inpkg+=('btrfs-progs')
 		fi
 	else
@@ -2054,7 +2042,7 @@ install_packages()
 	# check that packages were trying to install are available, slow as shit
 	# but I'm done doing this manually every time the arch repos change
 	for pkg in "${inpkg[@]}"; do
-		if pacman -Qq $pkg >/dev/null 2>&1 || pacman -Ssq "^$pkg$" >/dev/null 2>&1; then
+		if pacman -Ssq "^$pkg$" >/dev/null 2>&1; then
 			goodinpkg+=("$pkg")
 		else
 			echo "package missing or no longer available: $pkg -- ignoring"
@@ -2281,6 +2269,7 @@ install_background()
 
 		cp /etc/pacman.conf "$MNT/etc/pacman.conf"
 		cp /etc/pacman.d/mirrorlist "$MNT/etc/pacman.d/mirrorlist"
+		cp /etc/pacman.d/darkos-mirrorlist "$MNT/etc/pacman.d/darkos-mirrorlist"
 		al_repo "$MNT/etc/pacman.conf"
 
 		if [[ $PACSTRAP == 1 ]]; then
